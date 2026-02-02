@@ -13,6 +13,14 @@ The project includes a **Dockerized Simulation Lab**, enabling users to practice
 
 ![ITK DEMO](assets/demos/itk_demo.gif)
 
+## Disclaimer
+
+**ITK is for educational and authorized security auditing purposes only.**
+
+
+**Do not use this tool on ICS networks or equipment you do not own or have explicit permission to test.** Industrial Control Systems are fragile; improper scanning can cause physical damage or process disruption. The authors are not responsible for any damage caused by the misuse of this tool. 
+
+
 ## Key Features
 
 *   **Unified CLI Interface**: specific tools for Modbus, S7, BACnet, and EtherNet/IP under one roof.
@@ -126,12 +134,4 @@ The project is evolving through defined phases:
 *   **Phase 3: Protocol Drivers** - Full implementation of heavy lifting logic (TODO)
 *   **Phase 4: Exploitation Modules** - DoS tools, Replay Engine, and Flag Hunter (TODO)
 *   **Phase 5: Documentation** 
-
-## Disclaimer
-
-**ITK is for educational and authorized security auditing purposes only.**
-
-
-**Do not use this tool on ICS networks or equipment you do not own or have explicit permission to test.** Industrial Control Systems are fragile; improper scanning can cause physical damage or process disruption. The authors are not responsible for any damage caused by the misuse of this tool. 
-
 ---
