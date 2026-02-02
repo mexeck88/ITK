@@ -1,16 +1,14 @@
 services:
   # Target 1: Modbus TCP Simulator
   modbus-plc:
-    image: oitc/modbus-server
+    build:
+      context: ./modbus_sim
     container_name: itk-target-modbus
     ports:
       - "5020:5020"
-    environment:
-      - MODBUS_SERVER_PORT=5020
 
   # Target 2: S7comm Simulator (Siemens)
   s7-plc:
-    image: 1337_s7_sim # You will build this with the Dockerfile below
     build:
       context: ./s7-sim
     container_name: itk-target-s7
@@ -23,7 +21,7 @@ services:
       context: ./blackbox
     container_name: itk-target-custom
     ports:
-      - "9876:9876"
+      - "19876:19876"
 
   # Target 4: BACnet/IP Simulator (Building Automation)
   bacnet-device:

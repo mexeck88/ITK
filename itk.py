@@ -247,7 +247,7 @@ def modbus_scan(ctx, unit, range_start, range_end, slaves):
     
     if slaves:
         status("Scanning for active slave IDs (this may take a while)...", "info")
-        result = protocol.scan_slaves(range(1, 20))  # Current Limit for speed reasons
+        result = protocol.scan_slaves(range(1, 100)) 
     else:
         status(f"Scanning unit {unit}, addresses {range_start}-{range_end}...", "info")
         result = protocol.scan(range_start, range_end)
@@ -363,45 +363,173 @@ def s7(ctx):
 
 
 @s7.command('scan')
+@click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
+@click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
+@click.option('--range-end', '-e', type=int, default=100, help="Max DB number to scan")
 @click.pass_context
-def s7_scan(ctx):
+def s7_scan(ctx, rack, slot, range_end):
     """Enumerate all Data Blocks and CPU info."""
-    status(f"Scanning S7 at {ctx.obj['TARGET']}:{ctx.obj['PORT']}...", "info")
-    # TODO: Implement S7 scan
-    status("Not implemented - See Phase 3", "warning")
+    from protocols.s7comm import S7Protocol
+    from core.output import print_result
+    
+    protocol = S7Protocol(
+        target=ctx.obj['TARGET'],
+        port=ctx.obj['PORT'],
+        timeout=ctx.obj['TIMEOUT'],
+        rack=rack,
+        slot=slot
+    )
+    
+    conn_result = protocol.connect()
+    if not conn_result.success:
+        print_result(conn_result, ctx.obj['JSON'])
+        return
+
+    status(f"Connected to {ctx.obj['TARGET']} (Rack {rack}, Slot {slot})", "success")
+    status(f"Scanning for Data Blocks (1-{range_end})...", "info")
+    
+    result = protocol.scan(end_db=range_end)
+    protocol.close()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            # Show CPU Info
+            cpu = result.data.get('cpu_info', {})
+            if cpu:
+                status(f"CPU State: {cpu.get('cpu_state', 'Unknown')}", "success")
+                status(f"PDU Length: {cpu.get('pdu_length', 0)} bytes", "info")
+            
+            # Show DBs
+            dbs = result.data.get('found_dbs', [])
+            if dbs:
+                status(f"Found {len(dbs)} accessible Data Blocks: {dbs}", "success")
+            else:
+                status("No Data Blocks found (or scan blocked)", "warning")
+        else:
+            print_result(result, use_json=False)
 
 
 @s7.command('read')
 @click.argument('address')  # Format: DB.OFFSET (e.g., 1.0)
 @click.argument('type', type=click.Choice(['db', 'input', 'output', 'marker']))
-@click.option('--size', '-s', type=int, default=1, help="Number of bytes to read")
+@click.option('--size', '-sz', type=int, default=1, help="Number of bytes to read")
+@click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
+@click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
 @click.pass_context
-def s7_read(ctx, address, type, size):
+def s7_read(ctx, address, type, size, rack, slot):
     """Read from memory. Usage: read <DB.OFFSET> <TYPE>"""
-    status(f"Reading {size} bytes from {type} {address}...", "info")
-    # TODO: Implement S7 read
-    status("Not implemented - See Phase 3", "warning")
+    from protocols.s7comm import S7Protocol
+    from core.output import print_result
+    
+    protocol = S7Protocol(
+        target=ctx.obj['TARGET'],
+        port=ctx.obj['PORT'],
+        timeout=ctx.obj['TIMEOUT'],
+        rack=rack,
+        slot=slot
+    )
+    
+    conn_result = protocol.connect()
+    if not conn_result.success:
+        print_result(conn_result, ctx.obj['JSON'])
+        return
+    
+    result = protocol.read(address, type, size)
+    protocol.close()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            hex_data = result.data['hex']
+            ascii_data = result.data['ascii']
+            status(f"Read {size} bytes from {type} {address}:", "success")
+            console.print(f"  HEX:   {hex_data}")
+            console.print(f"  ASCII: {ascii_data}")
+        else:
+            print_result(result, use_json=False)
 
 
 @s7.command('write')
 @click.argument('address')  # Format: DB.OFFSET
 @click.argument('type', type=click.Choice(['db', 'output', 'marker']))
 @click.argument('value', type=int)
+@click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
+@click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
 @click.pass_context
-def s7_write(ctx, address, type, value):
+def s7_write(ctx, address, type, value, rack, slot):
     """Write to memory. Usage: write <DB.OFFSET> <TYPE> <VALUE>"""
-    status(f"Writing {value} to {type} {address}...", "info")
-    # TODO: Implement S7 write
-    status("Not implemented - See Phase 3", "warning")
+    from protocols.s7comm import S7Protocol
+    from core.output import print_result
+    
+    protocol = S7Protocol(
+        target=ctx.obj['TARGET'],
+        port=ctx.obj['PORT'],
+        timeout=ctx.obj['TIMEOUT'],
+        rack=rack,
+        slot=slot
+    )
+    
+    conn_result = protocol.connect()
+    if not conn_result.success:
+        print_result(conn_result, ctx.obj['JSON'])
+        return
+    
+    # Check value range (byte)
+    if not (0 <= value <= 255):
+        status("Value must be a single byte (0-255)", "error")
+        return
+    
+    result = protocol.write(address, value, type)
+    protocol.close()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            status(f"Wrote byte {value} (0x{value:02X}) to {type} {address}", "success")
+        else:
+            print_result(result, use_json=False)
 
 
 @s7.command('info')
+@click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
+@click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
 @click.pass_context
-def s7_info(ctx):
+def s7_info(ctx, rack, slot):
     """Get CPU module information."""
-    status(f"Getting S7 CPU info from {ctx.obj['TARGET']}...", "info")
-    # TODO: Implement S7 info
-    status("Not implemented - See Phase 3", "warning")
+    from protocols.s7comm import S7Protocol
+    from core.output import print_result
+    
+    protocol = S7Protocol(
+        target=ctx.obj['TARGET'],
+        port=ctx.obj['PORT'],
+        timeout=ctx.obj['TIMEOUT'],
+        rack=rack,
+        slot=slot
+    )
+    
+    conn_result = protocol.connect()
+    if not conn_result.success:
+        print_result(conn_result, ctx.obj['JSON'])
+        return
+    
+    result = protocol.get_info()
+    protocol.close()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            cpu = result.data
+            status(f"S7 Protocol Connection Info:", "success")
+            console.print(f"  CPU State:  {cpu.get('cpu_state')}")
+            console.print(f"  PDU Length: {cpu.get('pdu_length')} bytes")
+            console.print(f"  Rack/Slot:  {cpu.get('rack')}/{cpu.get('slot')}")
+        else:
+            print_result(result, use_json=False)
 
 
 # ============================================================================

@@ -8,6 +8,7 @@ from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusException
 from protocols.base import ICSProtocol, Result
 from typing import Optional, List, Dict, Any
+import logging
 
 
 class ModbusProtocol(ICSProtocol):
@@ -222,6 +223,9 @@ class ModbusProtocol(ICSProtocol):
         found_registers: List[Dict] = []
 
         try:
+            # Suppress pymodbus logging
+            logging.getLogger("pymodbus").setLevel(logging.CRITICAL)
+
             # Scan holding registers
             for addr in range(range_start, range_end):
                 try:
@@ -247,6 +251,9 @@ class ModbusProtocol(ICSProtocol):
                         })
                 except:
                     continue
+            
+            # Restore logging
+            logging.getLogger("pymodbus").setLevel(logging.NOTSET)
 
             return Result(
                 success=True,
@@ -271,6 +278,8 @@ class ModbusProtocol(ICSProtocol):
 
         active_slaves = []
 
+        logging.getLogger("pymodbus").setLevel(logging.CRITICAL)
+        
         for slave_id in slave_range:
             try:
                 result = self.client.read_holding_registers(0, 1, slave=slave_id)
@@ -278,6 +287,8 @@ class ModbusProtocol(ICSProtocol):
                     active_slaves.append(slave_id)
             except:
                 continue
+        
+        logging.getLogger("pymodbus").setLevel(logging.NOTSET)
 
         return Result(
             success=True,
