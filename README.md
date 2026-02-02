@@ -13,7 +13,7 @@ The project includes a **Dockerized Simulation Lab**, enabling users to practice
 
 ![ITK DEMO](assets/demos/itk_demo.gif)
 
-## Disclaimer
+## DISCLAIMER
 
 **ITK is for educational and authorized security auditing purposes only.**
 
