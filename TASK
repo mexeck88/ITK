@@ -1,0 +1,128 @@
+🛠 ITK (ICS Tool Kit) Development Roadmap
+📌 Project Vision
+A modular, CLI-driven framework designed for Industrial Control Systems (ICS) security auditing and Capture The Flag (CTF) competitions. ITK enables rapid discovery, enumeration, and exploitation of industrial protocols without requiring physical hardware, utilizing a built-in Dockerized simulation lab.
+
+🏗 Phase 1: Core Framework Architecture
+Goal: Build the "skeleton" that allows for modular protocol plugins.
+
+[ ] 1.1 Base Protocol Class (protocols/base.py)
+
+Define abstract methods: connect(), disconnect(), read_object(), write_object(), fingerprint().
+
+Implement a standard Result object for unified output across all protocols.
+
+[ ] 1.2 CLI Engine (itk.py)
+
+Setup click or argparse with subcommands: scan, read, write, exploit, fuzz.
+
+Support global flags: --target, --port, --timeout, --verbose.
+
+[ ] 1.3 Logging & Export Module
+
+Implement a "Hacker Console" output using the rich library.
+
+Build a JSON export flag (--json) for piping results to other tools.
+
+[ ] 1.4 Session Manager
+
+Create a mechanism to cache connection state to avoid handshake overhead during rapid-fire CTF commands.
+
+🧪 Phase 2: The "No-Hardware" Virtual Lab
+Goal: Build the targets for development and portfolio demonstrations.
+
+[ ] 2.1 Docker Orchestration (docker-compose.yml)
+
+Define a common network (ics-net) for all simulators.
+
+[ ] 2.2 Target: Modbus TCP (modbus-server)
+
+Configure standard registers for temperature and motor status.
+
+[ ] 2.3 Target: S7comm (s7_sim/)
+
+Create a snap7 Python server simulating a Siemens S7-300 with Data Blocks (DB1).
+
+[ ] 2.4 Target: BACnet/IP (bacnet_sim/)
+
+Use BAC0 to simulate a Building Automation controller with a Binary Output (Door Lock).
+
+[ ] 2.5 Target: EtherNet/IP (ethip_sim/)
+
+Use cpppo to simulate an Allen-Bradley PLC with a FLAG string tag.
+
+[ ] 2.6 Target: The "Black Box" (blackbox/)
+
+A raw socket listener requiring a custom 0x4954 header for a "secret" protocol challenge.
+
+🔌 Phase 3: Protocol Driver Implementation
+Goal: Implement the "Heavy Lifting" logic for each industrial standard.
+
+[ ] 3.1 Modbus Driver (protocols/modbus.py)
+
+Dependencies: pymodbus.
+
+Features: Read/Write Coils, Inputs, and Holding Registers.
+
+[ ] 3.2 S7comm Driver (protocols/s7.py)
+
+Dependencies: python-snap7.
+
+Features: Enumeration of Data Blocks (DBs), CPU state control (Start/Stop).
+
+[ ] 3.3 BACnet Driver (protocols/bacnet.py)
+
+Dependencies: BAC0.
+
+Features: Who-Is discovery, ReadProperty, WriteProperty (Overriding values).
+
+[ ] 3.4 EtherNet/IP Driver (protocols/enip.py)
+
+Dependencies: cpppo or pycomm3.
+
+Features: Tag browsing/enumeration, ReadTag, WriteTag.
+
+[ ] 3.5 Custom/Scapy Driver (protocols/custom.py)
+
+Dependencies: scapy.
+
+Features: Template for bit-level packet crafting for proprietary protocols.
+
+💀 Phase 4: CTF Exploitation & Discovery Modules
+Goal: Turn the drivers into offensive tools.
+
+[ ] 4.1 The "Lister" (Asset Mapping)
+
+Implement a protocol-aware crawler that finds all accessible addresses/tags automatically.
+
+[ ] 4.2 The "Replay" Engine
+
+Build a module to read .pcap files and re-send industrial commands with modified payloads.
+
+[ ] 4.3 Denial of Service (DoS) Modules
+
+s7_stop: Send CPU Stop command.
+
+enip_reset: Send identity reset commands.
+
+[ ] 4.4 The "Flag Hunter"
+
+A script that greps all strings and memory areas for the common FLAG{...} format across all connected protocols.
+
+📖 Phase 5: Documentation & Presentation
+Goal: Package the project for your Developer Portfolio.
+
+[ ] 5.1 Architecture Visualization
+
+Create a diagram showing how ITK interacts with the Purdue Model levels 1 and 2.
+
+[ ] 5.2 "Lab in a Box" Guide
+
+Write instructions on how to spin up the Docker lab for recruiters to test your code.
+
+[ ] 5.3 Protocol Extension Tutorial
+
+Document how to add a new protocol (e.g., DNP3 or MQTT) to the framework.
+
+[ ] 5.4 Demo Video
+
+Record a terminal session of ITK discovering and "unlocking" the door in the BACnet simulator.

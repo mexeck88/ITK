@@ -19,7 +19,7 @@ def run_server():
     store = ModbusSlaveContext(
         di=ModbusSequentialDataBlock(0, [0]*100),
         co=ModbusSequentialDataBlock(0, [0]*100),
-        hr=ModbusSequentialDataBlock(0, [0, 0, 42, 0, 0, 1337]), # Flag fragments at 2 and 5
+        hr=ModbusSequentialDataBlock(0, [0, 0, 42, 70, 76, 65, 71, 123, 77, 79, 68, 66, 85, 83, 125, 0, 0, 0, 0, 0]), # Flag fragments form ascii values
         ir=ModbusSequentialDataBlock(0, [0]*100)
     )
     context = ModbusServerContext(slaves={1: store, 2: store, 10: store}, single=False)

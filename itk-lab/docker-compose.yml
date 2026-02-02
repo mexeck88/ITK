@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Target 1: Modbus TCP Simulator
   modbus-plc:
