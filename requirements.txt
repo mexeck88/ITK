@@ -1,0 +1,6 @@
+rich
+click
+pymodbus
+python-snap7
+BAC0
+cpppo

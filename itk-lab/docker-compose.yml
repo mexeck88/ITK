@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Target 1: Modbus TCP Simulator
+  modbus-plc:
+    image: oitc/modbus-server
+    container_name: itk-target-modbus
+    ports:
+      - "5020:5020"
+    environment:
+      - MODBUS_SERVER_PORT=5020
+
+  # Target 2: S7comm Simulator (Siemens)
+  s7-plc:
+    image: 1337_s7_sim # You will build this with the Dockerfile below
+    build:
+      context: ./s7-sim
+    container_name: itk-target-s7
+    ports:
+      - "1020:102"
+
+  # Target 3: The Black Box (Custom Protocol)
+  blackbox-device:
+    build:
+      context: ./blackbox
+    container_name: itk-target-custom
+    ports:
+      - "9876:9876"
+
+  # Target 4: BACnet/IP Simulator (Building Automation)
+  bacnet-device:
+    build:
+      context: ./bacnet_sim
+    container_name: itk-target-bacnet
+    ports:
+      - "47808:47808/udp" # Standard BACnet port
+
+  # Target 5: EtherNet/IP Simulator (Allen-Bradley style)
+  eth-ip-plc:
+    build:
+      context: ./ethip_sim
+    container_name: itk-target-ethip
+    ports:
+      - "44818:44818" # TCP Encapsulation
+      - "2222:2222/udp" # Implicit I/O
