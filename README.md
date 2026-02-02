@@ -13,14 +13,6 @@ The project includes a **Dockerized Simulation Lab**, enabling users to practice
 
 ![ITK DEMO](assets/demos/itk_demo.gif)
 
-## DISCLAIMER
-
-**ITK is for educational and authorized security auditing purposes only.**
-
-
-**Do not use this tool on ICS networks or equipment you do not own or have explicit permission to test.** Industrial Control Systems are fragile; improper scanning can cause physical damage or process disruption. The authors are not responsible for any damage caused by the misuse of this tool. 
-
-
 ## Key Features
 
 *   **Unified CLI Interface**: specific tools for Modbus, S7, BACnet, and EtherNet/IP under one roof.
@@ -109,9 +101,30 @@ itk -t 192.168.1.10 enip scan
 itk -t 192.168.1.10 enip read FLAG tag
 ```
 
+## ITK Lab
+
+ITK includes 5 simulation boxes for testing the toolkit, these are simple docker containers that simulate the ICS/SCADA protocol. 
+
+
+| Service | Host | Port | Description |
+|---------|------|------|-------------|
+| **Modbus TCP** | `localhost` | `5020` | Simulated PLC with Coils & Holding Registers. |
+| **S7comm** | `localhost` | `1020` | Siemens S7-300 simulator (DB1, DB2, DB100). |
+| **BACnet/IP** | `localhost` | `47808` | (UDP) Building Automation controller. |
+| **EtherNet/IP**| `localhost` | `44818` | Allen-Bradley style PLC with CIP tags. |
+| **BlackBox** | `localhost` | `19876` | Custom challenge service (TCP). |
+
+```bash
+# Generate all 5 boxes
+docker-compose up -d
+
+# Stop the lab
+docker-compose down
+```
+
 ## Demos
 
-See ITK and the ITK sim lab in action below.
+See ITK in action below.
 
 ### Modbus Enumeration
 ![Modbus Scan Demo](assets/demos/modbus_scan.gif)
@@ -125,6 +138,8 @@ See ITK and the ITK sim lab in action below.
 ![JSON Pipeline Demo](assets/demos/json_pipe.gif)
 *Piping ITK output into `jq` for automated processing.*
 
+> **Note**: Add your GIF recordings to the `assets/demos/` directory to populate these placeholders.
+
 ## Roadmap
 
 The project is evolving through defined phases:
@@ -134,4 +149,12 @@ The project is evolving through defined phases:
 *   **Phase 3: Protocol Drivers** - Full implementation of heavy lifting logic (TODO)
 *   **Phase 4: Exploitation Modules** - DoS tools, Replay Engine, and Flag Hunter (TODO)
 *   **Phase 5: Documentation** 
+
+## Disclaimer
+
+**ITK is for educational and authorized security auditing purposes only.**
+
+
+**Do not use this tool on ICS networks or equipment you do not own or have explicit permission to test.** Industrial Control Systems are fragile; improper scanning can cause physical damage or process disruption. The authors are not responsible for any damage caused by the misuse of this tool. 
+
 ---
