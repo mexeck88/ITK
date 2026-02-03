@@ -287,55 +287,82 @@ class S7Protocol(ICSProtocol):
         
         print(f"Scanning {target} for PLCs (Racks 0-7, Slots 0-31)...")
 
-        for rack in range(8):
-            for slot in range(32):
-                client = snap7.client.Client()
-                try:
-                    client.connect(target, rack, slot, port)
-                    if client.get_connected():
-                        # Found a PLC!
-                        plc_data = {
-                            "rack": rack,
-                            "slot": slot,
-                            "cpu_state": "Unknown",
-                            "order_code": "Unknown",
-                            "version": "Unknown",
-                            "module_name": "Unknown",
-                            "serial_number": "Unknown",
-                            "copyright": "Unknown"
-                        }
-                        
-                        try:
-                            plc_data["cpu_state"] = client.get_cpu_state()
-                        except:
-                            pass
-
-                        try:
-                            plc_data["order_code"] = str(client.get_order_code())
-                        except:
-                            pass
-
-                        try:
-                            cpu_info = client.get_cpu_info()
-                            plc_data["version"] = f"{cpu_info.version_1}.{cpu_info.version_2}.{cpu_info.version_3}"
-                        except:
-                            pass
+        try:
+            for rack in range(8):
+                for slot in range(32):
+                    client = snap7.client.Client()
+                    try:
+                        client.connect(target, rack, slot, port)
+                        if client.get_connected():
+                            plc_data = {
+                                "rack": rack,
+                                "slot": slot,
+                                "cpu_state": "Unknown",
+                                "order_code": "Unknown",
+                                "version": "Unknown",
+                                "module_name": "Unknown",
+                                "serial_number": "Unknown",
+                                "copyright": "Unknown"
+                            }
                             
-                        # Try to read SZL 0x001C (Component ID)
-                        try:
-                            # 0x001C = Component Identification
-                            szl = client.read_szl(0x001C)
-                            pass 
-                        except:
-                            pass
+                            # 1. Order Code (Liveness Check)
+                            # Many simulators accept connections on all ports but return empty data.
+                            # We use the Order Code as a mandatory filter.
+                            valid_interface = False
+                            try:
+                                oc = client.get_order_code()
+                                if hasattr(oc, 'Code'):
+                                    # Decode bytes, strip nulls/whitespace
+                                    code_str = oc.Code.decode('ascii', errors='ignore').strip('\x00').strip()
+                                    if code_str:
+                                        plc_data["order_code"] = code_str
+                                        valid_interface = True
+                            except:
+                                pass
                             
-                        found_plcs.append(plc_data)
-                        client.disconnect()
-                except:
-                    pass
-                finally:
-                    client.destroy()
+                            if not valid_interface:
+                                # Likely a ghost interface from a permissive simulator
+                                client.disconnect()
+                                continue
 
+                            # 2. CPU State
+                            try:
+                                plc_data["cpu_state"] = client.get_cpu_state()
+                            except:
+                                pass
+
+                            # 3. Version
+                            try:
+                                cpu = client.get_cpu_info()
+                                plc_data["version"] = f"{cpu.version_1}.{cpu.version_2}.{cpu.version_3}"
+                            except:
+                                pass
+
+                            # 4. SZL (Module ID, Serial, Copyright)
+                            try:
+                                # 0x001C = Component Identification
+                                szl_list = client.read_szl(0x001C)
+                                for part in szl_list:
+                                    if hasattr(part, 'data') and hasattr(part, 'index'):
+                                        val = part.data.decode('ascii', errors='ignore').strip('\x00').strip()
+                                        if part.index == 1:
+                                            plc_data["module_name"] = val
+                                        elif part.index == 3:
+                                            plc_data["serial_number"] = val
+                                        elif part.index == 4:
+                                            plc_data["copyright"] = val
+                            except:
+                                pass
+                                
+                            found_plcs.append(plc_data)
+                            client.disconnect()
+                    except Exception:
+                        pass
+                    finally:
+                        client.destroy()
+        except KeyboardInterrupt:
+            print("\n[!] Scan interrupted by user. Returning partial results.")
+        
         # Restore logging
         logging.getLogger("snap7").setLevel(logging.NOTSET)
         

@@ -4,9 +4,22 @@ Unified interface: scan, read, write, info
 """
 
 import click
+import signal
+import sys
 from rich.console import Console
 from core.output import print_banner, status, print_table
 from core.session import session_manager
+
+
+def handle_sigint(_sig, _frame):  # pylint: disable=invalid-name
+    """
+    Handle SIGINT signal
+    """
+    print("\nReceived SIGINT. Exiting gracefully...")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_sigint)
+
 
 console = Console()
 
@@ -729,4 +742,5 @@ def custom(ctx):
 
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, handle_sigint)
     cli(obj={})
