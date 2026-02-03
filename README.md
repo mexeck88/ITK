@@ -71,6 +71,8 @@ itk -t 192.168.1.10 modbus write 0 coil 1
 #### S7comm (Siemens)
 Interacts with Siemens S7-300/400/1200/1500 PLCs.
 
+**Currently the S7 implementation doesn't work well, we are unable to properly enumerate**
+
 ```bash
 # Get CPU Module Info
 itk -t 192.168.1.10 s7 info

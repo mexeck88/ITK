@@ -20,6 +20,9 @@ MODBUS_EXAMPLES = """
   
   [green]Scan all registers:[/green]
     itk -t 192.168.1.10 modbus scan
+
+  [green]Scan all slaves:[/green]
+    itk -t 192.168.1.10 modbus scan --slaves
   
   [green]Read holding register 100:[/green]
     itk -t 192.168.1.10 modbus read 100 holding
@@ -41,6 +44,9 @@ S7_EXAMPLES = """
   
   [green]Scan all data blocks:[/green]
     itk -t 192.168.1.10 s7 scan
+
+  [green]Discover all PLCs:[/green]
+    itk -t 192.168.1.10 s7 scan --discover
   
   [green]Read 4 bytes from DB1 at offset 0:[/green]
     itk -t 192.168.1.10 s7 read 1.0 db --size 4
@@ -366,12 +372,80 @@ def s7(ctx):
 @click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
 @click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
 @click.option('--range-end', '-e', type=int, default=100, help="Max DB number to scan")
+@click.option('--discover', '-d', is_flag=True, help="Discover PLCs on all Racks/Slots")
 @click.pass_context
-def s7_scan(ctx, rack, slot, range_end):
+def s7_scan(ctx, rack, slot, range_end, discover):
     """Enumerate all Data Blocks and CPU info."""
     from protocols.s7comm import S7Protocol
     from core.output import print_result
     
+    if discover:
+        # Full network scan
+        status(f"Discovering PLCs on {ctx.obj['TARGET']}:{ctx.obj['PORT']}...", "info")
+        result = S7Protocol.scan_network(
+            target=ctx.obj['TARGET'],
+            port=ctx.obj['PORT'],
+            timeout=ctx.obj['TIMEOUT']
+        )
+        
+        plcs = result.data.get('plcs', [])
+        
+        if ctx.obj['JSON']:
+            print_result(result, use_json=True)
+            return
+
+        if not plcs:
+            status("No active PLCs found (checked Racks 0-7, Slots 0-31).", "warning")
+            return
+
+        status(f"Network Scan Complete. Found {len(plcs)} active interface(s).", "success")
+        
+        # Display Table of Interfaces
+        table_rows = []
+        for p in plcs:
+            r, s = p['rack'], p['slot']
+            order = p.get('order_code', 'Unknown')
+            ver = p.get('version', 'Unknown')
+            serial = p.get('serial_number', 'Unknown')
+            state = p.get('cpu_state', 'Unknown')
+            table_rows.append([f"{r}/{s}", order, ver, serial, state])
+            
+        print_table(
+            "Discovered S7 Interfaces",
+            ["Rack/Slot", "Order Output (MLFB)", "Firmware", "Serial Num", "CPU State"],
+            table_rows
+        )
+        
+        # Deep Scan each valid interface
+        for plc in plcs:
+            r, s = plc['rack'], plc['slot']
+            status(f"\nDeep scanning Rack {r}, Slot {s}...", "info")
+            
+            protocol = S7Protocol(
+                target=ctx.obj['TARGET'],
+                port=ctx.obj['PORT'],
+                timeout=ctx.obj['TIMEOUT'],
+                rack=r,
+                slot=s
+            )
+            conn = protocol.connect()
+            if conn.success:
+                scan_res = protocol.scan(end_db=range_end)
+                # Print scan result nicely (reuse existing logic or print_result)
+                # We'll use print_result but maybe standard scan prints enough status?
+                # scan() returns 'found_dbs' and 'cpu_info'.
+                # Let's verify what scan outputs.
+                if scan_res.success:
+                    dbs = scan_res.data.get('found_dbs', [])
+                    if dbs:
+                         status(f"  Found DBs: {dbs}", "success")
+                    else:
+                         status("  No Data Blocks found.", "warning")
+                protocol.close()
+            else:
+                status(f"  Failed to connect for deep scan: {conn.message}", "error")
+        return
+
     protocol = S7Protocol(
         target=ctx.obj['TARGET'],
         port=ctx.obj['PORT'],
@@ -390,7 +464,6 @@ def s7_scan(ctx, rack, slot, range_end):
     
     result = protocol.scan(end_db=range_end)
     protocol.close()
-    
     if ctx.obj['JSON']:
         print_result(result, use_json=True)
     else:
