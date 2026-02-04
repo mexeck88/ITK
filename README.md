@@ -71,14 +71,20 @@ itk -t 192.168.1.10 modbus write 0 coil 1
 #### S7comm (Siemens)
 Interacts with Siemens S7-300/400/1200/1500 PLCs.
 
-**Currently the S7 implementation doesn't work well, we are unable to properly enumerate**
+**NOTE**: S7 Scan Implementation is currently not working as intended
 
 ```bash
-# Get CPU Module Info
-itk -t 192.168.1.10 s7 info
+# Scan the default rack and slot
+itk -t 192.168.1.10 s7 scan
+
+# Deep scan the entire server (Enumerate all possible racks and slots)
+itk -t 192.168.1.10 s7 scan -d
 
 # Read 4 bytes from Data Block 1 at offset 0
 itk -t 192.168.1.10 s7 read 1.0 db --size 4
+
+# Write a real (float) value to DB 1 at offset 4
+itk -t 192.168.1.10 s7 write 1.4 db --value 25.5 --type real
 ```
 
 #### BACnet/IP
