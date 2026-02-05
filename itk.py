@@ -562,7 +562,7 @@ def bacnet_write(ctx, object_id, type, value):
 
 @cli.group(invoke_without_command=True)
 @click.pass_context
-def enip(ctx):
+def ethip(ctx):
     """EtherNet/IP: Tag browsing and manipulation."""
     ctx.obj['PROTOCOL'] = 'enip'
     ctx.obj['PORT'] = ctx.obj['PORT'] or 44818
@@ -570,45 +570,105 @@ def enip(ctx):
         show_examples("enip")
 
 
-@enip.command('scan')
+@ethip.command('scan')
 @click.pass_context
-def enip_scan(ctx):
+def ethip_scan(ctx):
     """Enumerate all tags."""
+    from protocols.EthIP import EthIP
+    from core.output import print_result
+
     status(f"Scanning EtherNet/IP at {ctx.obj['TARGET']}:{ctx.obj['PORT']}...", "info")
-    # TODO: Implement EtherNet/IP scan
-    status("Not implemented - See Phase 3", "warning")
+    
+    proto = EthIP(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
+    result = proto.scan()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            identities = result.data.get('identities', [])
+            status(f"Found {len(identities)} identity item(s)", "success")
+            for id_item in identities:
+                console.print(f"  [bold]Product:[/bold] {id_item.get('product_name')}")
+                console.print(f"  Vendor: {id_item.get('vendor_id')} | Device Type: {id_item.get('device_type')}")
+                console.print(f"  Serial: {id_item.get('serial')} | Code: {id_item.get('product_code')}")
+        else:
+            print_result(result, use_json=False)
 
 
-@enip.command('read')
+@ethip.command('read')
 @click.argument('tag_name')
 @click.argument('type', type=click.Choice(['tag']))
 @click.pass_context
-def enip_read(ctx, tag_name, type):
+def ethip_read(ctx, tag_name, type):
     """Read a tag. Usage: read <TAG_NAME> tag"""
+    from protocols.EthIP import EthIP
+    from core.output import print_result
+
     status(f"Reading tag '{tag_name}'...", "info")
-    # TODO: Implement EtherNet/IP read
-    status("Not implemented - See Phase 3", "warning")
+    proto = EthIP(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
+    
+    if proto.connect().success:
+        res = proto.read(tag_name)
+        proto.close()
+        if ctx.obj['JSON']: print_result(res, use_json=True)
+        else:
+            if res.success: status(f"{tag_name}: {res.data}", "success")
+            else: status(res.error, "error")
+    else:
+        status("Connection failed", "error")
 
 
-@enip.command('write')
+@ethip.command('write')
 @click.argument('tag_name')
 @click.argument('type', type=click.Choice(['tag']))
 @click.argument('value')
 @click.pass_context
-def enip_write(ctx, tag_name, type, value):
+def ethip_write(ctx, tag_name, type, value):
     """Write to a tag. Usage: write <TAG_NAME> tag <VALUE>"""
+    from protocols.EthIP import EthIP
+    from core.output import print_result
+
     status(f"Writing '{value}' to tag '{tag_name}'...", "info")
-    # TODO: Implement EtherNet/IP write
-    status("Not implemented - See Phase 3", "warning")
+    proto = EthIP(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
+    
+    if proto.connect().success:
+        res = proto.write(tag_name, value)
+        proto.close()
+        if ctx.obj['JSON']: print_result(res, use_json=True)
+        else:
+            if res.success: status("Write successful", "success")
+            else: status(res.error, "error")
+    else:
+        status("Connection failed", "error")
 
 
-@enip.command('info')
+@ethip.command('info')
 @click.pass_context
-def enip_info(ctx):
+def ethip_info(ctx):
     """Get device identity."""
+    from protocols.EthIP import EthIP
+    from core.output import print_result
+
     status(f"Getting EtherNet/IP identity from {ctx.obj['TARGET']}...", "info")
-    # TODO: Implement EtherNet/IP info
-    status("Not implemented - See Phase 3", "warning")
+    proto = EthIP(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
+    result = proto.get_info()
+    
+    if ctx.obj['JSON']:
+        print_result(result, use_json=True)
+    else:
+        if result.success:
+            # Re-use scan logic for display as get_info returns same structure in our impl
+            identities = result.data.get('identities', [])
+            if identities:
+                id_item = identities[0]
+                status(f"Device: {id_item.get('product_name')}", "success")
+                console.print(f"  Vendor ID: {id_item.get('vendor_id')}")
+                console.print(f"  Serial: {id_item.get('serial')}")
+            else:
+                status("No identity information found.", "warning")
+        else:
+            print_result(result, use_json=False)
 
 
 # ============================================================================
