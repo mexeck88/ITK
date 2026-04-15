@@ -1,4 +1,4 @@
-# ITK: ICS Tool Kit
+# ITK: ICS Tool Kit (WIP)
 
 **A Modular, CLI-Driven Framework for ICS Security Auditing & CTF Competitions**
 
@@ -146,17 +146,6 @@ See ITK in action below.
 ![JSON Pipeline Demo](assets/demos/json_pipe.gif)
 *Piping ITK output into `jq` for automated processing.*
 
-> **Note**: Add your GIF recordings to the `assets/demos/` directory to populate these placeholders.
-
-## Roadmap
-
-The project is evolving through defined phases:
-
-*   **Phase 1: Core Framework** - CLI skeleton, Logging, Session Manager ( In Progress)
-*   **Phase 2: Virtual Lab** - Dockerized Modbus, S7, BACnet, EnIP simulators (TODO)
-*   **Phase 3: Protocol Drivers** - Full implementation of heavy lifting logic (TODO)
-*   **Phase 4: Exploitation Modules** - DoS tools, Replay Engine, and Flag Hunter (TODO)
-*   **Phase 5: Documentation** 
 
 ## Disclaimer
 
