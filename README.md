@@ -1,4 +1,4 @@
-# ITK: ICS Tool Kit
+# ITK: ICS Tool Kit (WIP)
 
 **A Modular, CLI-Driven Framework for ICS Security Auditing & CTF Competitions**
 
