@@ -101,6 +101,9 @@ ENIP_EXAMPLES = """
   [green]Read tag named 'FLAG':[/green]
     itk -t 192.168.1.10 ethip read FLAG tag
 
+  [green]Read an array tag (e.g. a flag stored as 40 char codes):[/green]
+    itk -t 192.168.1.10 ethip read FLAG tag --count 40
+
   [green]Write to tag 'STATUS':[/green]
     itk -t 192.168.1.10 ethip write STATUS tag 1
 
@@ -616,21 +619,25 @@ def ethip_scan(ctx):
 @ethip.command('read')
 @click.argument('tag_name')
 @click.argument('type', type=click.Choice(['tag']))
+@click.option('--count', '-c', type=int, default=1, help="Number of array elements to read (for array tags)")
 @click.pass_context
-def ethip_read(ctx, tag_name, type):
-    """Read a tag. Usage: read <TAG_NAME> tag"""
+def ethip_read(ctx, tag_name, type, count):
+    """Read a tag. Usage: read <TAG_NAME> tag [--count N]"""
     from protocols.EthIP import EthIP
     from core.output import print_result
 
     status(f"Reading tag '{tag_name}'...", "info")
     proto = EthIP(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
-    
+
     if proto.connect().success:
-        res = proto.read(tag_name)
+        res = proto.read(tag_name, count)
         proto.close()
         if ctx.obj['JSON']: print_result(res, use_json=True)
         else:
-            if res.success: status(f"{tag_name} ({res.data['type']}) = {res.data['value']}", "success")
+            if res.success:
+                status(f"{tag_name} ({res.data['type']}) = {res.data['value']}", "success")
+                if res.data.get('ascii'):
+                    console.print(f"  ASCII: {res.data['ascii']}")
             else: status(res.error, "error")
     else:
         status("Connection failed", "error")

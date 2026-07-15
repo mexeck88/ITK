@@ -131,7 +131,13 @@ class EthIP(ICSProtocol):
     # Value (de)serialization
     # ------------------------------------------------------------------
     def _decode_value(self, type_code: int, data: bytes) -> Tuple[str, Any]:
-        """Decode CIP tag data into (type_name, python_value)."""
+        """
+        Decode CIP tag data into (type_name, python_value).
+
+        For elementary numeric types, decodes every element present in
+        `data` (not just the first), so a multi-element (array) read
+        returns the full array instead of silently truncating to one value.
+        """
         if type_code not in self.CIP_TYPES:
             return (f"0x{type_code:04X}", data.hex())
 
@@ -144,8 +150,13 @@ class EthIP(ICSProtocol):
         if name == "SSTRING":    # USINT length prefix
             slen = data[0]
             return (name, data[1:1 + slen].decode('utf-8', errors='replace'))
+
         size = struct.calcsize(fmt)
-        return (name, struct.unpack(fmt, data[:size])[0])
+        elements = [struct.unpack(fmt, data[i:i + size])[0]
+                    for i in range(0, len(data) - len(data) % size, size)]
+        if len(elements) <= 1:
+            return (name, elements[0] if elements else None)
+        return (name, elements)
 
     def _encode_value(self, type_code: int, value: Any) -> bytes:
         """Encode a user-supplied value into CIP wire bytes for the given type."""
@@ -242,9 +253,16 @@ class EthIP(ICSProtocol):
             type_code = struct.unpack('<H', payload[:2])[0]
             type_name, value = self._decode_value(type_code, payload[2:])
 
-            return Result(success=True,
-                          data={"tag": str(address), "type": type_name,
-                                "type_code": type_code, "value": value},
+            result_data = {"tag": str(address), "type": type_name,
+                           "type_code": type_code, "value": value}
+            # Convenience decode: CTF flags are often stored as an array of
+            # integer character codes rather than the STRING/SSTRING type.
+            if isinstance(value, list) and type_name in (
+                    "SINT", "USINT", "INT", "UINT", "DINT", "UDINT"):
+                result_data["ascii"] = ''.join(
+                    chr(v) if 32 <= v <= 126 else '.' for v in value)
+
+            return Result(success=True, data=result_data,
                           protocol="ethip", operation="read", target=f"{self.target}:{self.port}")
         except Exception as e:
             return Result(success=False, error=str(e), protocol="ethip", operation="read")
