@@ -8,6 +8,7 @@ import snap7
 import ctypes
 import logging
 import time
+import struct
 from protocols.base import ICSProtocol, Result
 from typing import Any, List, Dict, Optional
 
@@ -59,10 +60,12 @@ class S7Protocol(ICSProtocol):
                 self.client.library.Cli_SetParam(self.client.pointer, 2, ctypes.byref(ctypes.c_int(self.port)))
             
             # 5. Connect
-            self.client.connect()
-            
-            if self.client.get_connected():
+            result = self.client.library.Cli_Connect(self.client.pointer)  # 0 = OK
+            if result == 0 and self.client.get_connected():
                 return 1
+            # non-zero ISO/PDU handshake codes -> "partial" (valid TSAP, handshake failed)
+            if result != 0:
+                return 2
             return 0
             
         except Exception as e:
@@ -229,35 +232,71 @@ class S7Protocol(ICSProtocol):
 
         except Exception as e: return Result(False, error=str(e), protocol="s7")
 
-    def write(self, address: str, value: int, type: str = 'db') -> Result:
+    # S7 values are stored big-endian (Siemens convention).
+    _S7_ENCODERS = {
+        'byte': lambda v: bytearray([int(v) & 0xFF]),
+        'word': lambda v: bytearray(struct.pack('>H', int(v) & 0xFFFF)),
+        'int':  lambda v: bytearray(struct.pack('>h', int(v))),
+        'dint': lambda v: bytearray(struct.pack('>i', int(v))),
+        'real': lambda v: bytearray(struct.pack('>f', float(v))),
+        'bool': lambda v: bytearray([1 if str(v).strip().lower() in
+                                     ('1', 'true', 'on', 'yes') else 0]),
+    }
+
+    def _encode_value(self, value: Any, data_type: str) -> bytearray:
+        """Encode a value into S7 wire bytes for the given data type."""
+        encoder = self._S7_ENCODERS.get(data_type.lower())
+        if encoder is None:
+            raise ValueError(f"Unsupported data type '{data_type}' "
+                             f"(choose from: {', '.join(self._S7_ENCODERS)})")
+        if data_type.lower() == 'byte' and not 0 <= int(value) <= 255:
+            raise ValueError("byte value must be 0-255")
+        return encoder(value)
+
+    def write(self, address: str, value: Any, area: str = 'db',
+              data_type: str = 'byte') -> Result:
         """
-        Writes a single byte value to a specified S7 memory area.
+        Writes a typed value to a specified S7 memory area.
 
         Args:
-            address (str): Target address (format depends on type, see read()).
-            value (int): The byte value to write (0-255).
-            type (str): The memory area ('db', 'marker', 'output').
-                        Note: Writing to 'input' is generally not supported directly.
+            address (str): Target address.
+                           For 'db': 'DB_NUMBER.OFFSET' (e.g. '1.4').
+                           For others: byte offset (e.g. '10').
+            value: The value to write. Interpreted according to `data_type`.
+            area (str): Memory area ('db', 'marker', 'output').
+            data_type (str): How to encode `value` before writing —
+                             'byte', 'word', 'int', 'dint', 'real', or 'bool'.
 
         Returns:
-            Result: Success status.
+            Result: Success status, including the encoded bytes written.
         """
         if not self.client or not self.client.get_connected():
             return Result(False, error="Not connected", protocol="s7", operation="write")
 
         try:
-            data = bytearray([int(value)])
+            data = self._encode_value(value, data_type)
 
-            if type == 'db':
-                db, off = map(int, address.split('.'))
+            if area == 'db':
+                if '.' not in str(address):
+                    return Result(False, error="Invalid DB address (expected DB.OFFSET, e.g. 1.4)",
+                                  protocol="s7", operation="write")
+                db, off = map(int, str(address).split('.'))
                 self.client.db_write(db, off, data)
+            elif area == 'marker':
+                self.client.mb_write(int(address), data)
+            elif area == 'output':
+                self.client.ab_write(int(address), data)
+            else:
+                return Result(False, error=f"Cannot write to area '{area}'",
+                              protocol="s7", operation="write")
 
-            elif type == 'marker': self.client.mb_write(int(address), data)
-            elif type == 'output': self.client.ab_write(int(address), data)
+            return Result(True,
+                          data={"written": True, "value": value, "type": data_type,
+                                "area": area, "bytes": data.hex()},
+                          protocol="s7", operation="write", target=f"{self.target}:{self.port}")
 
-            return Result(True, data={"written": True, "val": value}, protocol="s7")
-
-        except Exception as e: return Result(False, error=str(e), protocol="s7")
+        except Exception as e:
+            return Result(False, error=str(e), protocol="s7", operation="write")
 
     def scan(self, start_db=1, end_db=100, strategy="auto") -> Result:
         """

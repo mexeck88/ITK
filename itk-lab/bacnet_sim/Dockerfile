@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install BAC0 pytz netifaces
+RUN pip install BAC0 pytz netifaces numpy
 
 COPY bacnet_server.py .
 # Standard BACnet port is 47808

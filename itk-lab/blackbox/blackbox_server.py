@@ -8,7 +8,7 @@ def run_blackbox():
     BlackBox Custom Protocol
 
     Listens on port 8888 for a custom protocol with a magic header of "IT" and a command byte.
-    If the command byte is 1, it sends a flag back to the client.
+    If the command byte is 0x99, it sends a flag back to the client.
     """
     # Protocol: [Magic: 0x49 0x54][Cmd: 1 byte][Data: 4 bytes]
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -18,7 +18,7 @@ def run_blackbox():
         while True:
             conn, addr = s.accept()
             data = conn.recv(1024)
-            if data[0:2] == b'\x49\x54':
+            if len(data) >= 3 and data[0:2] == b'\x49\x54':
                 cmd = data[2]
                 if cmd == 0x01: conn.send(b"STATUS_OK")
                 elif cmd == 0x99: conn.send(b"FLAG{CUSTOM_SCAPY_PRO}")

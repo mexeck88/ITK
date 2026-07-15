@@ -2,8 +2,7 @@
 Modbus Server file
 """
 from pymodbus.server import StartTcpServer
-from pymodbus.device import ModbusDeviceIdentification
-from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
+from pymodbus.datastore import ModbusSequentialDataBlock, ModbusDeviceContext, ModbusServerContext
 
 # Create 3 Slaves/devices (Unit IDs 1, 2, and 10)
 # Slave 1: Decoy (Empty)
@@ -16,27 +15,27 @@ def run_server():
     Slave 2: Decoy (Random Noise)
     Slave 10: The Target (Hidden registers)
     """
-    store_1 = ModbusSlaveContext(
+    store_1 = ModbusDeviceContext(
         di=ModbusSequentialDataBlock(0, [0]*100),
         co=ModbusSequentialDataBlock(0, [1, 0, 1, 0, 1, 0, 1, 0, 1, 0]),
         hr=ModbusSequentialDataBlock(0, [0]*100),
         ir=ModbusSequentialDataBlock(0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     )
 
-    store_2 = ModbusSlaveContext(
+    store_2 = ModbusDeviceContext(
         di=ModbusSequentialDataBlock(0, [1]*100),
         co=ModbusSequentialDataBlock(0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
         hr=ModbusSequentialDataBlock(0, [0]*100),
         ir=ModbusSequentialDataBlock(0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     )
 
-    store_10 = ModbusSlaveContext(
+    store_10 = ModbusDeviceContext(
         di=ModbusSequentialDataBlock(0, [0]*100),
         co=ModbusSequentialDataBlock(0, [0]*100),
         hr=ModbusSequentialDataBlock(0, [1, 0, 42, 70, 76, 65, 71, 123, 77, 79, 68, 66, 85, 83, 125, 0, 0, 0, 0, 0]), 
         ir=ModbusSequentialDataBlock(0, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     )
-    context = ModbusServerContext(slaves={1: store_1, 2: store_2, 10: store_10}, single=False)
+    context = ModbusServerContext(devices={1: store_1, 2: store_2, 10: store_10}, single=False)
     StartTcpServer(context=context, address=("0.0.0.0", 5020))
 
 if __name__ == "__main__":

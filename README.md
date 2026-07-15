@@ -71,8 +71,6 @@ itk -t 192.168.1.10 modbus write 0 coil 1
 #### S7comm (Siemens)
 Interacts with Siemens S7-300/400/1200/1500 PLCs.
 
-**NOTE**: S7 Scan Implementation is currently not working as intended
-
 ```bash
 # Scan the default rack and slot
 itk -t 192.168.1.10 s7 scan
@@ -103,10 +101,10 @@ Browses and modifies tags on CIP-enabled devices.
 
 ```bash
 # Enumerate all available tags
-itk -t 192.168.1.10 enip scan
+itk -t 192.168.1.10 ethip scan
 
 # Read a specific tag
-itk -t 192.168.1.10 enip read FLAG tag
+itk -t 192.168.1.10 ethip read FLAG tag
 ```
 
 ## ITK Lab
@@ -120,7 +118,7 @@ ITK includes 5 simulation boxes for testing the toolkit, these are simple docker
 | **S7comm** | `localhost` | `1020` | Siemens S7-300 simulator (DB1, DB2, DB100). |
 | **BACnet/IP** | `localhost` | `47808` | (UDP) Building Automation controller. |
 | **EtherNet/IP**| `localhost` | `44818` | Allen-Bradley style PLC with CIP tags. |
-| **BlackBox** | `localhost` | `19876` | Custom challenge service (TCP). |
+| **BlackBox** | `localhost` | `8888` | Custom challenge service (TCP). |
 
 ```bash
 # Generate all 5 boxes
@@ -146,7 +144,7 @@ See ITK in action below.
 ![JSON Pipeline Demo](assets/demos/json_pipe.gif)
 *Piping ITK output into `jq` for automated processing.*
 
-> **Note**: Add your GIF recordings to the `assets/demos/` directory to populate these placeholders.
+> **Note**: Add GIF recordings to the `assets/demos/` directory to populate these placeholders.
 
 ## Roadmap
 

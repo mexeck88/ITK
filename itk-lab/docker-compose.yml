@@ -21,7 +21,7 @@ services:
       context: ./blackbox
     container_name: itk-target-custom
     ports:
-      - "19876:19876"
+      - "8888:8888"
 
   # Target 4: BACnet/IP Simulator (Building Automation)
   bacnet-device:

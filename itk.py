@@ -63,8 +63,11 @@ S7_EXAMPLES = """
   [green]Read DB1 offset 0:[/green]
     itk -t 192.168.1.10 s7 read 1.0 db
 
-  [green]Write byte:[/green]
-    itk -t 192.168.1.10 s7 write 1.0 db 255
+  [green]Write a byte:[/green]
+    itk -t 192.168.1.10 s7 write 1.0 db --value 255 --type byte
+
+  [green]Write a float (REAL) to DB1 offset 4:[/green]
+    itk -t 192.168.1.10 s7 write 1.4 db --value 25.5 --type real
 """
 
 BACNET_EXAMPLES = """
@@ -93,19 +96,19 @@ ENIP_EXAMPLES = """
   [dim]Types: tag[/dim]
   
   [green]Enumerate all tags:[/green]
-    itk -t 192.168.1.10 enip scan
-  
+    itk -t 192.168.1.10 ethip scan
+
   [green]Read tag named 'FLAG':[/green]
-    itk -t 192.168.1.10 enip read FLAG tag
-  
+    itk -t 192.168.1.10 ethip read FLAG tag
+
   [green]Write to tag 'STATUS':[/green]
-    itk -t 192.168.1.10 enip write STATUS tag 1
-  
+    itk -t 192.168.1.10 ethip write STATUS tag 1
+
   [green]Get device identity:[/green]
-    itk -t 192.168.1.10 enip info
-    
+    itk -t 192.168.1.10 ethip info
+
   [green]Custom port:[/green]
-    itk -t 192.168.1.10 -p 44819 enip scan
+    itk -t 192.168.1.10 -p 44819 ethip scan
 """
 
 
@@ -371,12 +374,12 @@ def s7(ctx):
     ctx.obj['PROTOCOL'] = 's7'
     ctx.obj['PORT'] = ctx.obj['PORT'] or 102
     if ctx.invoked_subcommand is None:
-        pass 
+        show_examples("s7")
 
 @s7.command('scan')
 @click.option('--rack', '-r', type=int, default=0, help="PLC Rack Number")
 @click.option('--slot', '-s', type=int, default=2, help="PLC Slot Number")
-@click.option('--aggressive', '-A', is_flag=True, help="Brute-force TSAPs (Like s7scan.py)")
+@click.option('--aggressive', '-A', '-d', 'aggressive', is_flag=True, help="Brute-force TSAPs (deep scan, like s7scan.py)")
 @click.pass_context
 def s7_scan(ctx, rack, slot, aggressive):
     """Scan S7 device. Default: Connects to Rack/Slot. Aggressive: Scans TSAPs."""
@@ -482,21 +485,31 @@ def s7_read(ctx, address, type, size):
 
 @s7.command('write')
 @click.argument('address')
-@click.argument('value', type=int)
-@click.argument('type', type=click.Choice(['db', 'output', 'marker']), default='db')
+@click.argument('area', type=click.Choice(['db', 'output', 'marker']), default='db')
+@click.option('--value', required=True, help="Value to write (e.g. 255, 25.5, ON)")
+@click.option('--type', 'data_type',
+              type=click.Choice(['byte', 'word', 'int', 'dint', 'real', 'bool']),
+              default='byte', help="How to encode the value before writing")
 @click.pass_context
-def s7_write(ctx, address, value, type):
-    """ Writes to a target format in a desingated slot and rack """
+def s7_write(ctx, address, area, value, data_type):
+    """Write a typed value to an S7 memory area.
+
+    Usage: write <ADDRESS> <AREA> --value <V> [--type <TYPE>]
+    Example: write 1.4 db --value 25.5 --type real
+    """
     from protocols.s7comm import S7Protocol
     from core.output import print_result
     proto = S7Protocol(ctx.obj['TARGET'], ctx.obj['PORT'], ctx.obj['TIMEOUT'])
-    if proto.connect().success:
-        res = proto.write(address, value, type)
-        proto.close()
-        if ctx.obj['JSON']: print_result(res, True)
-        else:
-            if res.success: status("Write successful", "success")
-            else: status(res.error, "error")
+    conn = proto.connect()
+    if not conn.success:
+        status(f"Connection failed: {conn.error}", "error")
+        return
+    res = proto.write(address, value, area, data_type)
+    proto.close()
+    if ctx.obj['JSON']: print_result(res, True)
+    else:
+        if res.success: status(f"Wrote {value} ({data_type}) to {area.upper()} {address}", "success")
+        else: status(res.error, "error")
 
 
 # ============================================================================
@@ -586,12 +599,16 @@ def ethip_scan(ctx):
         print_result(result, use_json=True)
     else:
         if result.success:
-            identities = result.data.get('identities', [])
-            status(f"Found {len(identities)} identity item(s)", "success")
-            for id_item in identities:
-                console.print(f"  [bold]Product:[/bold] {id_item.get('product_name')}")
-                console.print(f"  Vendor: {id_item.get('vendor_id')} | Device Type: {id_item.get('device_type')}")
-                console.print(f"  Serial: {id_item.get('serial')} | Code: {id_item.get('product_code')}")
+            tags = result.data.get('tags', [])
+            status(f"Found {len(tags)} tag(s)", "success")
+            if tags:
+                print_table(
+                    "EtherNet/IP Tags",
+                    ["Instance", "Name", "Type"],
+                    [[t['instance'], t['name'], t['type']] for t in tags]
+                )
+            if result.data.get('note'):
+                status(result.data['note'], "warning")
         else:
             print_result(result, use_json=False)
 
@@ -613,7 +630,7 @@ def ethip_read(ctx, tag_name, type):
         proto.close()
         if ctx.obj['JSON']: print_result(res, use_json=True)
         else:
-            if res.success: status(f"{tag_name}: {res.data}", "success")
+            if res.success: status(f"{tag_name} ({res.data['type']}) = {res.data['value']}", "success")
             else: status(res.error, "error")
     else:
         status("Connection failed", "error")

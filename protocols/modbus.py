@@ -112,13 +112,13 @@ class ModbusProtocol(ICSProtocol):
 
         try:
             if register_type == 'coil':
-                result = self.client.read_coils(address, count, slave=self.unit_id)
+                result = self.client.read_coils(address, count=count, device_id=self.unit_id)
             elif register_type == 'discrete':
-                result = self.client.read_discrete_inputs(address, count, slave=self.unit_id)
+                result = self.client.read_discrete_inputs(address, count=count, device_id=self.unit_id)
             elif register_type == 'input':
-                result = self.client.read_input_registers(address, count, slave=self.unit_id)
+                result = self.client.read_input_registers(address, count=count, device_id=self.unit_id)
             elif register_type == 'holding':
-                result = self.client.read_holding_registers(address, count, slave=self.unit_id)
+                result = self.client.read_holding_registers(address, count=count, device_id=self.unit_id)
             else:
                 return Result(
                     success=False,
@@ -175,9 +175,9 @@ class ModbusProtocol(ICSProtocol):
 
         try:
             if register_type == 'coil':
-                result = self.client.write_coil(address, bool(value), slave=self.unit_id)
+                result = self.client.write_coil(address, bool(value), device_id=self.unit_id)
             elif register_type == 'holding':
-                result = self.client.write_register(address, int(value), slave=self.unit_id)
+                result = self.client.write_register(address, int(value), device_id=self.unit_id)
             else:
                 return Result(
                     success=False,
@@ -229,27 +229,27 @@ class ModbusProtocol(ICSProtocol):
             # Scan holding registers
             for addr in range(range_start, range_end):
                 try:
-                    result = self.client.read_holding_registers(addr, 1, slave=self.unit_id)
+                    result = self.client.read_holding_registers(addr, count=1, device_id=self.unit_id)
                     if not result.isError() and result.registers[0] != 0:
                         found_registers.append({
                             "address": addr,
                             "type": "holding",
                             "value": result.registers[0]
                         })
-                except:
+                except ModbusException:
                     continue
 
             # Scan coils
             for addr in range(range_start, min(range_end, 100)):  # Limit coil scan
                 try:
-                    result = self.client.read_coils(addr, 1, slave=self.unit_id)
+                    result = self.client.read_coils(addr, count=1, device_id=self.unit_id)
                     if not result.isError() and result.bits[0]:
                         found_registers.append({
                             "address": addr,
                             "type": "coil",
                             "value": True
                         })
-                except:
+                except ModbusException:
                     continue
             
             # Restore logging
@@ -282,10 +282,10 @@ class ModbusProtocol(ICSProtocol):
         
         for slave_id in slave_range:
             try:
-                result = self.client.read_holding_registers(0, 1, slave=slave_id)
+                result = self.client.read_holding_registers(0, count=1, device_id=slave_id)
                 if not result.isError():
                     active_slaves.append(slave_id)
-            except:
+            except ModbusException:
                 continue
         
         logging.getLogger("pymodbus").setLevel(logging.NOTSET)
