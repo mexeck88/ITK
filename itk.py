@@ -34,22 +34,29 @@ console = Console()
 MODBUS_EXAMPLES = """
 [bold cyan]Modbus Examples:[/bold cyan]
   [dim]Types: coil (1-bit R/W), discrete (1-bit RO), input (16-bit RO), holding (16-bit R/W)[/dim]
-  
-  [green]Scan all registers:[/green]
+  [dim]Use -u/--unit to target a specific slave/unit ID (default 1).[/dim]
+
+  [green]Full auto-enumeration (discover units, sweep all areas, decode ASCII):[/green]
+    itk -t 192.168.1.10 modbus enumerate
+
+  [green]Enumerate a specific unit over a wider address range:[/green]
+    itk -t 192.168.1.10 modbus enumerate -u 52 -e 256
+
+  [green]Scan registers on unit 1:[/green]
     itk -t 192.168.1.10 modbus scan
 
-  [green]Scan all slaves:[/green]
+  [green]Discover active slave/unit IDs:[/green]
     itk -t 192.168.1.10 modbus scan --slaves
-  
-  [green]Read holding register 100:[/green]
-    itk -t 192.168.1.10 modbus read 100 holding
-  
+
+  [green]Read holding register 100 on unit 52:[/green]
+    itk -t 192.168.1.10 modbus read 100 holding -u 52
+
   [green]Write 1234 to holding register 100:[/green]
     itk -t 192.168.1.10 modbus write 100 holding 1234
-  
+
   [green]Read coil 0:[/green]
     itk -t 192.168.1.10 modbus read 0 coil
-    
+
   [green]Custom port:[/green]
     itk -t 192.168.1.10 -p 5020 modbus scan
 """
@@ -278,6 +285,9 @@ def modbus_scan(ctx, unit, range_start, range_end, slaves):
         if result.success:
             if slaves:
                 status(f"Found {result.data['count']} active slaves: {result.data['active_slaves']}", "success")
+                if result.data.get('ignores_unit_id'):
+                    status("Device answered on every unit ID -> it ignores the unit ID field. "
+                           "The real target unit must be taken from captured traffic, not active scanning.", "warning")
             else:
                 status(f"Found {result.data['found']} non-zero registers", "success")
                 if result.data['registers']:
@@ -364,6 +374,80 @@ def modbus_write(ctx, address, type, value, unit):
             status(f"Wrote {value} to {type.upper()} {address}", "success")
         else:
             print_result(result, use_json=False)
+
+
+@modbus.command('enumerate')
+@click.option('--unit', '-u', type=int, default=None,
+              help="Modbus unit/slave ID. If omitted, ITK discovers present units first.")
+@click.option('--range-start', '-s', type=int, default=0, help="Start address")
+@click.option('--range-end', '-e', type=int, default=256, help="End address")
+@click.pass_context
+def modbus_enumerate(ctx, unit, range_start, range_end):
+    """Fully enumerate a device: discover units, sweep all memory areas, decode ASCII."""
+    from protocols.modbus import ModbusProtocol
+    from core.output import print_result
+
+    def run_enum(unit_id):
+        proto = ModbusProtocol(target=ctx.obj['TARGET'], port=ctx.obj['PORT'],
+                               timeout=ctx.obj['TIMEOUT'], unit_id=unit_id)
+        c = proto.connect()
+        if not c.success:
+            print_result(c, ctx.obj['JSON'])
+            return None
+        res = proto.enumerate_all(range_start, range_end)
+        proto.close()
+        return res
+
+    # Decide which unit(s) to enumerate.
+    units = []
+    if unit is not None:
+        units = [unit]
+    else:
+        disc = ModbusProtocol(target=ctx.obj['TARGET'], port=ctx.obj['PORT'],
+                              timeout=ctx.obj['TIMEOUT'], unit_id=1)
+        if not disc.connect().success:
+            status(f"Could not connect to {ctx.obj['TARGET']}:{ctx.obj['PORT']}", "failure")
+            return
+        status("No unit ID given - discovering present units (1-99)...", "info")
+        sres = disc.scan_slaves(range(1, 100))
+        disc.close()
+        found = sres.data['active_slaves']
+        if sres.data.get('ignores_unit_id'):
+            status("Device ignores the unit ID field; enumerating as unit 1. "
+                   "For a specific device, pass -u <id> "
+                   "taken from captured traffic.", "warning")
+            units = [1]
+        elif found:
+            status(f"Present units: {found}", "success")
+            units = found
+        else:
+            status("No units responded.", "failure")
+            return
+
+    for uid in units:
+        status(f"Enumerating unit {uid}, addresses {range_start}-{range_end}...", "info")
+        result = run_enum(uid)
+        if result is None:
+            continue
+        if ctx.obj['JSON']:
+            print_result(result, use_json=True)
+            continue
+        if not result.success:
+            print_result(result, use_json=False)
+            continue
+
+        d = result.data
+        status(f"Unit {uid}: {d['total_readable']} readable objects", "success")
+        for area, adata in d['areas'].items():
+            if not adata['readable_count']:
+                continue
+            rows = [[r['address'], r['value']] for r in adata['readable']]
+            print_table(f"{area} (unit {uid})", ["Address", "Value"], rows)
+            if adata.get('ascii_lowbyte'):
+                console.print(f"  [bold]ASCII (low byte):[/bold] {adata['ascii_lowbyte']!r}")
+                console.print(f"  [bold]ASCII (big-endian):[/bold] {adata['ascii_bigendian']!r}")
+        if d['total_readable'] == 0:
+            status(f"Unit {uid}: nothing readable in range - widen --range-end or check the unit ID.", "warning")
 
 
 # ============================================================================
